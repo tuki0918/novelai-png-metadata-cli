@@ -1,27 +1,61 @@
-/*
-Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"os"
 
+	pngstructure "github.com/dsoprea/go-png-image-structure/v2"
 	"github.com/spf13/cobra"
 )
 
 // metadataCmd represents the metadata command
 var metadataCmd = &cobra.Command{
 	Use:   "metadata",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "",
+	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("metadata called")
+
+		filePath, err := cmd.Flags().GetString("file")
+		if err != nil {
+			panic(err)
+		}
+
+		file, err := os.Open(filePath)
+		if err != nil {
+			panic(err)
+		}
+		defer file.Close()
+
+		pmp := pngstructure.NewPngMediaParser()
+		intfc, err := pmp.ParseFile(filePath)
+		if err != nil {
+			panic(err)
+		}
+
+		cs := intfc.(*pngstructure.ChunkSlice)
+		index := cs.Index()
+		chunks, found := index["tEXt"]
+		if found != true {
+			panic("NovelAI metadata not found")
+		}
+
+		set := make(map[string]string, len(chunks))
+
+		for _, c := range chunks {
+			metadata := bytes.Split(c.Data, []byte("\x00"))
+			title := string(metadata[0])
+			data := string(metadata[1])
+			set[title] = data
+		}
+
+		bytes, err := json.Marshal(set)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(string(bytes))
 	},
 }
 
@@ -33,6 +67,7 @@ func init() {
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
 	// metadataCmd.PersistentFlags().String("foo", "", "A help for foo")
+	metadataCmd.PersistentFlags().String("file", "", "")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
