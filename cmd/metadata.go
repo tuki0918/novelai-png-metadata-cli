@@ -8,13 +8,28 @@ import (
 
 	pngstructure "github.com/dsoprea/go-png-image-structure/v2"
 	"github.com/spf13/cobra"
+	"github.com/tidwall/gjson"
 )
+
+type Metadata struct {
+	Title    string  `json:"title"`
+	Software string  `json:"software"`
+	Source   string  `json:"source"`
+	Prompts  string  `json:"prompts"`
+	Uc       string  `json:"uc"`
+	Steps    int64   `json:"steps"`
+	Strength float64 `json:"strength"`
+	Seed     int64   `json:"seed"`
+	Scale    int64   `json:"scale"`
+	Sampler  string  `json:"sampler"`
+	Noise    float64 `json:"noise"`
+}
 
 // metadataCmd represents the metadata command
 var metadataCmd = &cobra.Command{
 	Use:   "metadata",
 	Short: "",
-	Long:  ``,
+	Long:  "",
 	Run: func(cmd *cobra.Command, args []string) {
 
 		filePath, err := cmd.Flags().GetString("file")
@@ -44,17 +59,30 @@ var metadataCmd = &cobra.Command{
 		set := make(map[string]string, len(chunks))
 
 		for _, c := range chunks {
-			metadata := bytes.Split(c.Data, []byte("\x00"))
-			title := string(metadata[0])
-			data := string(metadata[1])
-			set[title] = data
+			data := bytes.Split(c.Data, []byte("\x00"))
+			title := string(data[0])
+			value := string(data[1])
+			set[title] = value
 		}
 
-		bytes, err := json.Marshal(set)
+		metadata := Metadata{
+			Title:    set["Title"],
+			Software: set["Software"],
+			Source:   set["Source"],
+			Prompts:  set["Description"],
+			Uc:       gjson.Get(set["Comment"], "uc").String(),
+			Steps:    gjson.Get(set["Comment"], "steps").Int(),
+			Strength: gjson.Get(set["Comment"], "strength").Float(),
+			Seed:     gjson.Get(set["Comment"], "seed").Int(),
+			Scale:    gjson.Get(set["Comment"], "scale").Int(),
+			Sampler:  gjson.Get(set["Comment"], "sampler").String(),
+			Noise:    gjson.Get(set["Comment"], "noise").Float(),
+		}
+
+		bytes, err := json.Marshal(metadata)
 		if err != nil {
 			panic(err)
 		}
-
 		fmt.Println(string(bytes))
 	},
 }
